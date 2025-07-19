@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Live Team Status</title>
+  <style>
+    @font-face {
+      font-family: 'MicrogrammaD';
+      src: url('Microgramma D Extended Bold.otf') format('opentype');
+    }
+    @font-face {
+      font-family: 'EngraversGothic';
+      src: url('Engravers Gothic Regular.otf') format('opentype');
+    }
+    @font-face {
+      font-family: 'ODIN';
+      src: url('ODIN.otf') format('opentype');
+    }
+
+    body {
+      margin: 0;
+      font-family: 'ODIN', 'MicrogrammaD', Arial, sans-serif;
+      font-size: 18px;
+      background: transparent;
+    }
+
+    .leaderboard {
+      width: 100%;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      padding: 6px 8px;
+      border-bottom: 1px solid #000000;
+      transition: transform 0.6s ease, opacity 0.6s ease;
+    }
+
+    .row.header {
+      background: linear-gradient(to bottom, #a900af, #700074);
+      color: #fff;
+      font-weight: bold;
+    }
+
+    .row.header .team-col,
+    .row.header .alive-col,
+    .row.header .elims-col {
+      font-size: 20px;
+    }
+
+    .row.header .team-col {
+      justify-content: flex-start;
+      padding-left: 48px;
+    }
+
+    .row.team-row {
+      background: linear-gradient(
+        to right,
+        #e700ad 40px,
+        #ffffff 8px,
+        #ffffff 50%,
+        #0f0f0f 50%
+      );
+      color: #000;
+    }
+
+    .row.team-row.dead {
+      background: linear-gradient(
+        to right,
+        #6d0052 40px,
+        #777777 8px,
+        #777777 50%,
+        #000000 50%
+      );
+      color: #000000;
+    }
+
+    .team-col {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      padding-left: 8px;
+    }
+
+    .alive-col {
+      flex: 0 0 80px;
+      text-align: center;
+    }
+
+    .elims-col {
+      flex: 0 0 50px;
+      text-align: center;
+      font-size: 24px;
+      color: #fff;
+      font-weight: bold;
+    }
+
+    .team-row.dead .elims-col {
+      color: #777777;
+    }
+
+    .team-row.dead .rank-badge {
+      font-size: 24px;
+      color: #777777;
+    }
+
+    .team-row.dead .team-name {
+      font-size: 24px;
+    }
+
+   .rank-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;              /* Adjust width to fit two digits */
+  height: 32px;             /* Make it square for visual balance */
+  font-size: 24px;
+  margin-right: 18px;
+  background: #00000000;
+  color: #ffffff;
+  border-radius: 50%;
+  text-align: center;
+  font-weight: bold;
+  border: 0px solid #ffffff00;
+}
+
+    .team-name {
+      font-size: 24px;
+    }
+
+    .team-logo {
+      height: 30px;
+      width: auto;
+      margin-right: 8px;
+    }
+
+    .team-row.dead .team-logo {
+      opacity: 0.5;
+    }
+
+    .alive-bars {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+    }
+
+    .bar {
+      width: 6px;
+      height: 24px;
+      margin: 0 2px;
+      background: #999;
+      border-radius: 0px;
+    }
+
+    .bar.alive {
+      background: #e700ad;
+    }
+
+    .team-row.dead .bar {
+      background: #3a3a3a;
+    }
+
+    .slide-out {
+      transform: translateX(200%);
+      opacity: 0;
+    }
+
+    /* === LEGEND ROW === */
+    .legend-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      background: #0f0f0f;
+      padding: 8px 45px;
+      border-bottom: 0px solid #00000000;
+      gap: 24px;
+      transition: transform 0.6s ease, opacity 0.6s ease;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .legend-box {
+      width: 16px;
+      height: 16px;
+      border-radius: 0px;
+      display: inline-block;
+    }
+
+    .legend-box.alive {
+      background-color: #e700ad;
+    }
+
+    .legend-box.eliminated {
+      background-color: #777777;
+    }
+
+    .legend-label {
+      font-size: 16px;
+      color: #ffffff;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+  <div class="leaderboard">
+    <div class="row header" id="headerRow">
+      <div class="team-col">TEAM</div>
+      <div class="alive-col">ALIVE</div>
+      <div class="elims-col">FIN.</div>
+    </div>
+    <div id="teamRows"></div>
+
+    <!-- Legend -->
+    <div class="legend-row" id="legendRow">
+      <div class="legend-item">
+        <span class="legend-box alive"></span>
+        <span class="legend-label">ALIVE</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-box eliminated"></span>
+        <span class="legend-label">ELIMINATED</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SHEET_ID = '1uhcK932M28ZYpuYUCuezL7PEcuiA9OE8G1J5ZNYkQ_A';
+    const GID = '38258553';
+    const INTERVAL = 1000;
+    let eliminationOrder = [];
+    let animationTriggered = false;
+
+    async function fetchAndRender() {
+      if (animationTriggered) return; // ✅ Prevent re-rendering after animation
+
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&_=${Date.now()}`;
+      try {
+        const res = await fetch(url);
+        const text = await res.text();
+        const json = JSON.parse(text.match(/\{.*\}/s)[0]);
+        const rows = json.table.rows || [];
+
+        const teams = rows.map(r => {
+          const name = r.c[0]?.v?.trim() || '';
+          const logo = r.c[1]?.v || '';
+          const fin = Number(r.c[2]?.v) || 0;
+          const stats = [3, 4, 5, 6].map(i => (r.c[i]?.v || '').toString().trim().toLowerCase());
+          const alive = stats.filter(s => s === 'alive').length;
+          const deadAll = (alive === 0);
+          return { name, logo, fin, stats, alive, deadAll };
+        }).filter(t => t.name);
+
+        const currentDead = teams.filter(t => t.deadAll).map(t => t.name);
+        eliminationOrder = eliminationOrder.filter(name => currentDead.includes(name));
+        currentDead.forEach(name => {
+          if (!eliminationOrder.includes(name)) eliminationOrder.push(name);
+        });
+
+        const liveTeams = teams.filter(t => !t.deadAll).sort((a, b) => b.alive - a.alive);
+      // Filter dead teams
+const allDeadTeams = teams.filter(t => t.deadAll);
+
+// Sort them by eliminationOrder
+const deadTeams = eliminationOrder
+  .map(name => allDeadTeams.find(t => t.name === name))
+  .filter(Boolean);
+
+// Append any missing dead teams not yet in eliminationOrder
+const remainingDeadTeams = allDeadTeams.filter(t => !eliminationOrder.includes(t.name));
+const fullOrder = [...liveTeams, ...deadTeams.reverse(), ...remainingDeadTeams.reverse()];
+
+        const container = document.getElementById("teamRows");
+        container.innerHTML = '';
+
+        fullOrder.forEach((team, index) => {
+          const row = document.createElement("div");
+          row.classList.add("row", "team-row");
+          if (team.deadAll) row.classList.add("dead");
+
+          const teamCol = document.createElement("div");
+          teamCol.classList.add("team-col");
+
+          const badge = document.createElement("span");
+          badge.classList.add("rank-badge");
+          badge.textContent = index + 1;
+
+          const logoImg = document.createElement("img");
+          logoImg.classList.add("team-logo");
+          logoImg.src = team.logo;
+
+          const nameSpan = document.createElement("span");
+          nameSpan.classList.add("team-name");
+          nameSpan.textContent = team.name;
+
+          teamCol.appendChild(badge);
+          teamCol.appendChild(logoImg);
+          teamCol.appendChild(nameSpan);
+
+          const aliveCol = document.createElement("div");
+          aliveCol.classList.add("alive-col");
+          const aliveBars = document.createElement("div");
+          aliveBars.classList.add("alive-bars");
+
+          for (let i = 0; i < 4; i++) {
+            const bar = document.createElement("div");
+            bar.classList.add("bar");
+            if (team.alive > 0 && i < team.alive) bar.classList.add("alive");
+            aliveBars.appendChild(bar);
+          }
+          aliveCol.appendChild(aliveBars);
+
+          const elimsCol = document.createElement("div");
+          elimsCol.classList.add("elims-col");
+          elimsCol.textContent = team.fin;
+
+          row.appendChild(teamCol);
+          row.appendChild(aliveCol);
+          row.appendChild(elimsCol);
+
+          container.appendChild(row);
+        });
+
+       // === Animation Trigger ===
+if (!animationTriggered && liveTeams.length === 4) {
+  animationTriggered = true;
+
+  const teamRows = Array.from(document.querySelectorAll('.team-row')).reverse();
+  const legend = document.getElementById('legendRow');
+  const header = document.getElementById('headerRow');
+
+  // 1. Slide out legend immediately
+  legend.classList.add('slide-out');
+
+  // 2. Slide out team cards 1-by-1 with small stagger (starts immediately)
+  teamRows.forEach((row, i) => {
+    setTimeout(() => {
+      row.classList.add('slide-out');
+    }, i * 100); // reduced delay
+  });
+
+  // 3. Header slides out after last team row
+  const totalDelay = teamRows.length * 100 + 200; // buffer after last row
+  setTimeout(() => {
+    header.classList.add('slide-out');
+  }, totalDelay);
+}
+
+      } catch (e) {
+        console.error('Fetch error:', e);
+      }
+    }
+
+    fetchAndRender();
+    setInterval(fetchAndRender, INTERVAL);
+  </script>
+</body>
+</html>

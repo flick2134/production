@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>WWCD Percentages</title>
+  <style>
+    @font-face {
+      font-family: 'MicrogrammaD';
+      src: url('Microgramma D Extended Bold.otf') format('opentype');
+    }
+    @font-face {
+      font-family: 'Square';
+      src: url('Square.otf') format('opentype');
+    }
+    body {
+      margin: 0;
+      background: transparent;
+      font-family: Square, Arial, sans-serif;
+      color: #fff;
+    }
+    .wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 24px;
+      padding: 24px;
+      flex-wrap: wrap;
+    }
+    .wwcd-card {
+      width: 300px;
+      background-color: #0f0f0f;
+      margin: 12px;
+      display: flex;
+      flex-direction: column;
+      animation: fadeInTop 0.6s ease-out;
+      overflow: visible;
+      font-family: Square, Arial, sans-serif;
+      position: relative;
+    }
+    @keyframes fadeInTop {
+      0% { opacity: 0; transform: translateY(-20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeOutBottom {
+      0% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(30px); }
+    }
+    .fade-out {
+      animation: fadeOutBottom 0.5s ease forwards;
+    }
+    .wwcd-card-content {
+      display: flex;
+      align-items: center;
+      padding: 10px 16px;
+    }
+    .team-logo-wrapper {
+      width: 100px;
+      height: 100px;
+      background: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      margin-left: 10px;
+      margin-top: -30px;
+      z-index: 1;
+    }
+    .team-logo {
+      width: 90px;
+      height: 90px;
+      object-fit: contain;
+    }
+    .team-right-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-left: 40px;
+    }
+    .status-circles {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .status-circle {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background-color: #e700ad;
+    }
+    .status-circle.dead {
+      background-color: #3a3a3a;
+      opacity: 0.8;
+    }
+    .team-name {
+      font-size: 16px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-align: center;
+      margin-top: 4px;
+    }
+    .wwcd-bottom {
+      background: linear-gradient(to bottom, #a900af, #700074);
+      color: #ffffff;
+      padding: 8px 14px;
+      font-size: 22px;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper" id="wwcd-container"></div>
+  <script>
+    const SHEET_ID = '1uhcK932M28ZYpuYUCuezL7PEcuiA9OE8G1J5ZNYkQ_A';
+    const GID = '38258553';
+    const INTERVAL = 1000;
+    const shownTeams = new Map();
+
+    async function fetchData() {
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&_=${Date.now()}`;
+      try {
+        const res = await fetch(url);
+        const text = await res.text();
+        const json = JSON.parse(text.match(/\{.*\}/s)[0]);
+        const rows = json.table.rows;
+
+        const teams = rows.map(row => {
+          const name = row.c[0]?.v?.trim() || '';
+          const logo = row.c[1]?.v || '';
+          const fin = Number(row.c[2]?.v) || 0;
+          const stats = [3, 4, 5, 6].map(i => row.c[i]?.v?.toLowerCase() || '');
+          const alive = stats.filter(s => s === 'alive').length;
+          const deadAll = alive === 0;
+          return { name, logo, fin, stats, alive, deadAll };
+        }).filter(t => t.name);
+
+        const aliveTeams = teams.filter(t => !t.deadAll);
+        if (aliveTeams.length > 4) {
+          document.getElementById('wwcd-container').innerHTML = '';
+          shownTeams.clear();
+          return;
+        }
+
+        const container = document.getElementById('wwcd-container');
+        const totalAlivePlayers = aliveTeams.reduce((sum, t) => sum + t.alive, 0);
+
+        for (const [name, el] of shownTeams.entries()) {
+          const found = teams.find(t => t.name === name);
+          if (!found || found.deadAll) {
+            el.classList.add('fade-out');
+            shownTeams.delete(name);
+            setTimeout(() => el.remove(), 500);
+          }
+        }
+
+        const displayTeams = aliveTeams.slice(0, 4);
+        displayTeams.forEach(team => {
+          const wwcd = totalAlivePlayers ? ((team.alive / totalAlivePlayers) * 100).toFixed(0) : '0';
+          const circles = team.stats.map(status =>
+            `<div class="status-circle ${status === 'dead' ? 'dead' : ''}"></div>`
+          ).join('');
+
+          if (!shownTeams.has(team.name)) {
+            const card = document.createElement('div');
+            card.className = 'wwcd-card';
+            card.innerHTML = `
+              <div class="wwcd-card-content">
+                <div class="team-logo-wrapper">
+                  <img src="${team.logo}" class="team-logo" onerror="this.style.display='none'">
+                </div>
+                <div class="team-right-section">
+                  <div class="status-circles">${circles}</div>
+                  <div class="team-name">${team.name}</div>
+                </div>
+              </div>
+              <div class="wwcd-bottom">
+                <span>WWCD</span>
+                <span>${wwcd}%</span>
+              </div>
+            `;
+            container.appendChild(card);
+            shownTeams.set(team.name, card);
+          } else {
+            const card = shownTeams.get(team.name);
+            card.querySelector('.status-circles').innerHTML = circles;
+            card.querySelector('.team-name').textContent = team.name;
+            card.querySelector('.wwcd-bottom').innerHTML = `
+              <span>WWCD</span>
+              <span>${wwcd}%</span>
+            `;
+          }
+        });
+      } catch (err) {
+        console.error('Fetch error:', err);
+      }
+    }
+    fetchData();
+    setInterval(fetchData, INTERVAL);
+  </script>
+</body>
+</html>
